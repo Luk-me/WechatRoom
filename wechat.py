@@ -1,5 +1,35 @@
-import itchat,time,threading,sys,os
+import itchat,time,threading,sys,os,platform
 from itchat.content import *
+
+def touch_html():
+    html_text="""<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>%s</title>
+</head>
+<body>
+  
+</body>
+</html>"""
+    file=['Personal-log.html','Group-log.html']
+    for i in file:
+        if os.path.isfile(i):
+            continue
+        else:
+            with open(i,'w') as f:
+                f.write(html_text%i)
+
+def write_html(filename,code):
+    with open(filename,'r',encoding='utf-8') as f:
+        lines = []
+        for line in f: 
+            lines.append(line)
+        lines.insert(-2, '%s\n'%code) # 在倒数第二行插入
+        s = ''.join(lines)
+    with open(filename,'w',encoding='utf-8') as f:
+        f.write(s)
 
 def send_mess():
     time.sleep(1)
@@ -134,33 +164,56 @@ def send_mess_group(flag):
             flag=True
 
 
-@itchat.msg_register([TEXT])
+@itchat.msg_register([TEXT,RECORDING])
 def Personal_reply(msg):
     date='\n---------------'+str(time.strftime('%Y/%m/%d  %H:%M:%S',time.localtime(time.time())))+'---------------'    #获取时间
-    rst=msg['User']['RemarkName']+":"    #消息來源
+    rst=msg['User']['RemarkName']+":"    #消息来源
     if msg['Type'] == 'Text':
         print(date+'\n'+rst+msg['Text'])
         #history
         mesg=str(rst+msg['Text'])
-        with open('Personal-log','a') as f:
+        with open('Personal-log.html','a',encoding='utf-8') as f:
             f.write(date+'\n')
             f.write(mesg+'\n')
+    elif msg['Type'] == 'Recording':    #语音消息
+        msg['Text'](msg['FileName'])
+        if (platform.system() == 'Windows'):    #判断操作系统 移动文件到对应文件夹
+            os.system('move %s Recording/'%msg['FileName'])
+        else:
+            os.system('mv %s Recording/'%msg['FileName'])
+        rst=msg['User']['NickName']+"(\'"+msg['User']['RemarkName']+"\'):"    #消息来源
+        mesg='<p>'+str(rst)+'</p>'
+        code='<audio controls="controls" height="100" width="100"> \n\t <source src="Recording/%s" type="audio/mp3" /> \n\t <source src="Recording/%s" type="audio/ogg" /> \n <embed height="100" width="100" src="Recording/%s" /> \n </audio>' %(msg["FileName"],msg["FileName"],msg["FileName"])
+        html_code='%s\n%s\n%s\n'%(data,mesg,code)
+        write_html('Personal-log.html',html_code)
 
-@itchat.msg_register([TEXT], isGroupChat=True)
+
+@itchat.msg_register([TEXT,RECORDING], isGroupChat=True)
 def Group_reply(msg):     
-    G_date='\n---------------'+str(time.strftime('%Y/%m/%d  %H:%M:%S',time.localtime(time.time())))+'---------------'    #获取时间
-    G_rst=msg['User']['NickName']+"(\'"+msg['ActualNickName']+"\'):"    #消息來源
+    date='\n---------------'+str(time.strftime('%Y/%m/%d  %H:%M:%S',time.localtime(time.time())))+'---------------'    #获取时间
+    rst=msg['User']['NickName']+"(\'"+msg['ActualNickName']+"\'):"    #消息来源
     if msg['Type'] == 'Text':
-        G_Text=msg['Text']    
-        print(G_date+'\n'+G_rst+G_Text)
+        Text=msg['Text']    
+        print(date+'\n'+rst+Text)
         #history
-        mesg=str(G_rst+msg['Text'])
-        with open('Group-log','a') as f:
-            f.write(G_date+'\n')
+        mesg=str(rst+msg['Text'])
+        with open('Group-log.html','a',encoding='utf-8') as f:
+            f.write(date+'\n')
             f.write(mesg+'\n')
-
+    elif msg['Type'] == 'Recording':    #语音消息
+        msg['Text'](msg['FileName'])
+        cmd="move %s Recording/"%msg['FileName']
+        if (platform.system() == 'Windows'):           #判断操作系统 移动文件到对应文件夹
+            os.system('move %s Recording/'%msg['FileName'])
+        else:
+            os.system('mv %s Recording/'%msg['FileName'])
+        mesg='<p>'+str(rst)+'</p>'
+        code='<audio controls="controls" height="100" width="100"> \n\t <source src="Recording/%s" type="audio/mp3" /> \n\t <source src="Recording/%s" type="audio/ogg" /> \n <embed height="100" width="100" src="Recording/%s" /> \n </audio>' %(msg["FileName"],msg["FileName"],msg["FileName"])
+        html_code='<p>%s</p>\n%s\n%s\n'%(date,mesg,code)
+        write_html('Group-log.html',html_code)
+        print(date+'\n'+'收到一条语音消息: '+rst+msg['FileName'])
     
-
+touch_html()
 itchat.auto_login(enableCmdQR=2,hotReload=True)
 threading.Thread(target=send_mess).start()
 itchat.run()
