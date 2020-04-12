@@ -1,6 +1,11 @@
 import itchat,time,threading,sys,os,platform
 from itchat.content import *
 
+def mkdir():
+    folder=['Picture','Attachment','Video','Recording']
+    for i in folder:
+        if not os.path.exists(i):
+            os.mkdir(i)
 def touch_html():
     html_text="""<!DOCTYPE html>
 <html lang="zh">
@@ -163,56 +168,76 @@ def send_mess_group(flag):
             itchat.send(Text,toUserName=to)
             flag=True
 
+def mv_file(filename,file_dir):  #判断操作系统 移动文件到对应文件夹
+    cmd = ((platform.system() == 'Windows') and 'move %s %s/'%(filename,file_dir) or 'mv %s %s/'%(filename,file_dir))
+    os.system(cmd)
 
-@itchat.msg_register([TEXT,RECORDING])
+@itchat.msg_register([TEXT,RECORDING,PICTURE,VIDEO])
 def Personal_reply(msg):
-    date='\n---------------'+str(time.strftime('%Y/%m/%d  %H:%M:%S',time.localtime(time.time())))+'---------------'    #获取时间
-    rst=msg['User']['RemarkName']+":"    #消息来源
+    date='---------------'+str(time.strftime('%Y/%m/%d  %H:%M:%S',time.localtime(time.time())))+'---------------'    #获取时间
+    rst=msg['User']['NickName']+": "    #消息来源
+    mesg='<p>'+str(rst)+'</p>'
     if msg['Type'] == 'Text':
         print(date+'\n'+rst+msg['Text'])
         #history
-        mesg=str(rst+msg['Text'])
-        with open('Personal-log.html','a',encoding='utf-8') as f:
-            f.write(date+'\n')
-            f.write(mesg+'\n')
+        html_code = '<p>%s</p>\n%s\n%s\n'%(date,rst,Text)
+        write_html('Group-log.html',html_code)
     elif msg['Type'] == 'Recording':    #语音消息
         msg['Text'](msg['FileName'])
-        if (platform.system() == 'Windows'):    #判断操作系统 移动文件到对应文件夹
-            os.system('move %s Recording/'%msg['FileName'])
-        else:
-            os.system('mv %s Recording/'%msg['FileName'])
-        rst=msg['User']['NickName']+"(\'"+msg['User']['RemarkName']+"\'):"    #消息来源
-        mesg='<p>'+str(rst)+'</p>'
+        mv_file(msg['FileName'],msg['Type'])
         code='<audio controls="controls" height="100" width="100"> \n\t <source src="Recording/%s" type="audio/mp3" /> \n\t <source src="Recording/%s" type="audio/ogg" /> \n <embed height="100" width="100" src="Recording/%s" /> \n </audio>' %(msg["FileName"],msg["FileName"],msg["FileName"])
-        html_code='%s\n%s\n%s\n'%(data,mesg,code)
+        html_code='<p>%s</p>\n%s\n%s\n'%(date,mesg,code)
         write_html('Personal-log.html',html_code)
+        print(date+'\n'+'收到一条语音消息: '+rst+msg['FileName'])
+    elif msg['Type'] == 'Picture':   #圖片  
+        msg['Text'](msg['FileName'])   #儲存文件
+        mv_file(msg['FileName'],msg['Type'])
+        code="<img width=\"25%\" height=\"25%\" src=\"Picture/"+msg['FileName']+"\">"
+        html_code='<p>%s</p>\n%s\n%s\n'%(date,mesg,code)
+        write_html('Personal-log.html',html_code)
+        print(date+'\n'+'收到一张图片: '+rst+msg['FileName'])
+    elif msg['Type'] == 'Video':
+        msg['Text'](msg['FileName'])
+        mv_file(msg['FileName'],msg['Type'])
+        code='<video width="320" height="240" controls="controls"> \n\t <source src="Video/%s" type="video/mp4" /> \n\t <source src="Video/%s" type="video/ogg" /> \n\t <source src="Video/%s" type="video/webm" /> \n\t <object data="Video/%s" width="320" height="240"> \n\t\t <embed width="320" height="240" src="Video/%s" /> \n\t </object> \n </Video>' %(msg["FileName"],msg["FileName"],msg["FileName"],msg["FileName"],msg["FileName"])   #網站目錄
+        html_code='<p>%s</p>\n%s\n%s\n'%(date,mesg,code)
+        write_html('Personal-log.html',html_code)
+        print(date+'\n'+'收到一段视频: '+rst+msg['FileName'])
 
-
-@itchat.msg_register([TEXT,RECORDING], isGroupChat=True)
+@itchat.msg_register([TEXT,RECORDING,PICTURE,VIDEO], isGroupChat=True)
 def Group_reply(msg):     
-    date='\n---------------'+str(time.strftime('%Y/%m/%d  %H:%M:%S',time.localtime(time.time())))+'---------------'    #获取时间
-    rst=msg['User']['NickName']+"(\'"+msg['ActualNickName']+"\'):"    #消息来源
+    date='---------------'+str(time.strftime('%Y/%m/%d  %H:%M:%S',time.localtime(time.time())))+'---------------'    #获取时间
+    rst=msg['User']['NickName']+": "    #消息来源
+    mesg='<p>'+str(rst)+'</p>'
     if msg['Type'] == 'Text':
         Text=msg['Text']    
         print(date+'\n'+rst+Text)
         #history
-        mesg=str(rst+msg['Text'])
-        with open('Group-log.html','a',encoding='utf-8') as f:
-            f.write(date+'\n')
-            f.write(mesg+'\n')
+        html_code = '<p>%s</p>\n%s\n%s\n'%(date,rst,Text)
+        write_html('Group-log.html',html_code)
     elif msg['Type'] == 'Recording':    #语音消息
         msg['Text'](msg['FileName'])
-        cmd="move %s Recording/"%msg['FileName']
-        if (platform.system() == 'Windows'):           #判断操作系统 移动文件到对应文件夹
-            os.system('move %s Recording/'%msg['FileName'])
-        else:
-            os.system('mv %s Recording/'%msg['FileName'])
-        mesg='<p>'+str(rst)+'</p>'
+        mv_file(msg['FileName'],msg['Type'])
         code='<audio controls="controls" height="100" width="100"> \n\t <source src="Recording/%s" type="audio/mp3" /> \n\t <source src="Recording/%s" type="audio/ogg" /> \n <embed height="100" width="100" src="Recording/%s" /> \n </audio>' %(msg["FileName"],msg["FileName"],msg["FileName"])
         html_code='<p>%s</p>\n%s\n%s\n'%(date,mesg,code)
         write_html('Group-log.html',html_code)
         print(date+'\n'+'收到一条语音消息: '+rst+msg['FileName'])
+    elif msg['Type'] == 'Picture':   #圖片
+        msg['Text'](msg['FileName'])   #儲存文件
+        mv_file(msg['FileName'],msg['Type'])
+        code="<img width=\"25%\" height=\"25%\" src=\"Picture/"+msg['FileName']+"\">"
+        html_code='<p>%s</p>\n%s\n%s\n'%(date,mesg,code)
+        write_html('Personal-log.html',html_code)
+        print(date+'\n'+'收到一张图片: '+rst+msg['FileName'])
+    elif msg['Type'] == 'Video':
+        msg['Text'](msg['FileName'])
+        mv_file(msg['FileName'],msg['Type'])
+        code='<video width="320" height="240" controls="controls"> \n\t <source src="Video/%s" type="video/mp4" /> \n\t <source src="Video/%s" type="video/ogg" /> \n\t <source src="Video/%s" type="video/webm" /> \n\t <object data="Video/%s" width="320" height="240"> \n\t\t <embed width="320" height="240" src="Video/%s" /> \n\t </object> \n </Video>' %(msg["FileName"],msg["FileName"],msg["FileName"],msg["FileName"],msg["FileName"])   #網站目錄
+        html_code='<p>%s</p>\n%s\n%s\n'%(date,mesg,code)
+        write_html('Group-log.html',html_code)
+        print(date+'\n'+'收到一段视频: '+rst+msg['FileName'])
     
+mkdir() 
 touch_html()
 itchat.auto_login(enableCmdQR=2,hotReload=True)
 threading.Thread(target=send_mess).start()
